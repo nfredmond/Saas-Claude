@@ -1,38 +1,60 @@
 /**
- * Equity screening using CEJST (Climate & Economic Justice Screening Tool)
- * and EJScreen data.
+ * CEJST-aligned equity screening.
  *
- * CEJST identifies "disadvantaged communities" per the Justice40 Initiative.
- * This module checks whether corridor tracts are flagged as disadvantaged
- * and provides equity indicators.
- *
- * Data source: https://screeningtool.geoplatform.gov/
- * API: https://screeningtool.geoplatform.gov/en/methodology
+ * This module uses tract-level ACS inputs we already fetch and applies
+ * transparent proxy thresholds aligned with CEJST/Justice40 concepts:
+ * low income + burden indicators (poverty, minority concentration,
+ * low vehicle access, and transit dependency).
  */
 
 export interface EquityScreening {
   totalTracts: number;
   disadvantagedTracts: number;
   pctDisadvantaged: number;
+  lowIncomeTracts: number;
+  highPovertyTracts: number;
+  highMinorityTracts: number;
+  lowVehicleAccessTracts: number;
+  highTransitDependencyTracts: number;
+  burdenedLowIncomeTracts: number;
   ejIndicators: {
-    lowIncome: boolean;           // Below 65th percentile FPL
-    highMinority: boolean;        // Above area median minority %
+    lowIncome: boolean;
+    highMinority: boolean;
     linguisticallyIsolated: boolean;
-    highPoverty: boolean;         // Above 20% poverty rate
-    lowVehicleAccess: boolean;    // Above 10% zero-vehicle HH
-    transitDependent: boolean;    // High transit mode share relative to area
+    highPoverty: boolean;
+    lowVehicleAccess: boolean;
+    transitDependent: boolean;
   };
   title6Flags: string[];
   justice40Eligible: boolean;
-  equityScore: number; // 0-100 composite
-  source: "census-derived";
+  equityScore: number;
+  source: "cejst-proxy-census";
 }
 
-/**
- * Derive equity screening from Census ACS data already fetched.
- * This avoids an additional API call to CEJST (which has rate limits)
- * by using the same underlying indicators the CEJST tool uses.
- */
+interface CensusTractForEquity {
+  geoid: string;
+  pctMinority: number;
+  pctBelowPoverty: number;
+  medianIncome: number | null;
+  zeroVehicleHouseholds: number;
+  totalHouseholds: number;
+  transitCommuters?: number;
+  totalCommuters?: number;
+}
+
+const THRESHOLDS = {
+  lowIncomeMedian: 50000,
+  highPovertyPct: 30,
+  highMinorityPct: 50,
+  lowVehicleAccessPct: 10,
+  transitDependencyPct: 15,
+};
+
+function pct(numerator: number, denominator: number): number {
+  if (denominator <= 0) return 0;
+  return Math.round((numerator / denominator) * 1000) / 10;
+}
+
 export function screenEquity(
   censusData: {
     pctMinority: number;
@@ -40,80 +62,103 @@ export function screenEquity(
     pctZeroVehicle: number;
     pctTransit: number;
     medianIncomeWeighted: number | null;
-    tracts: Array<{
-      geoid: string;
-      pctMinority: number;
-      pctBelowPoverty: number;
-      medianIncome: number | null;
-      zeroVehicleHouseholds: number;
-      totalHouseholds: number;
-    }>;
+    tracts: CensusTractForEquity[];
   }
 ): EquityScreening {
   const tracts = censusData.tracts;
 
-  // Determine disadvantaged status per tract using CEJST-aligned thresholds
-  // A tract is "disadvantaged" if it exceeds thresholds on income AND at least
-  // one environmental/health/transportation burden indicator
-  const disadvantagedCount = tracts.filter((t) => {
-    const isLowIncome = t.medianIncome !== null && t.medianIncome < 50000; // ~65th percentile nationally
-    const hasBurden =
-      t.pctBelowPoverty > 20 ||
-      t.pctMinority > 50 ||
-      (t.totalHouseholds > 0 && t.zeroVehicleHouseholds / t.totalHouseholds > 0.1);
-    return isLowIncome && hasBurden;
-  }).length;
+  const tractFlags = tracts.map((tract) => {
+    const zeroVehiclePct = pct(tract.zeroVehicleHouseholds, tract.totalHouseholds);
+    const transitPct = pct(tract.transitCommuters ?? 0, tract.totalCommuters ?? 0);
 
-  const pctDisadvantaged =
-    tracts.length > 0 ? Math.round((disadvantagedCount / tracts.length) * 1000) / 10 : 0;
+    const lowIncome = tract.medianIncome !== null && tract.medianIncome < THRESHOLDS.lowIncomeMedian;
+    const highPoverty = tract.pctBelowPoverty >= THRESHOLDS.highPovertyPct;
+    const highMinority = tract.pctMinority >= THRESHOLDS.highMinorityPct;
+    const lowVehicleAccess = zeroVehiclePct >= THRESHOLDS.lowVehicleAccessPct;
+    const transitDependency = transitPct >= THRESHOLDS.transitDependencyPct;
 
-  // Indicator flags
+    const burdenCount = [highPoverty, highMinority, lowVehicleAccess, transitDependency].filter(Boolean).length;
+    const disadvantaged = lowIncome && burdenCount >= 1;
+
+    return {
+      geoid: tract.geoid,
+      lowIncome,
+      highPoverty,
+      highMinority,
+      lowVehicleAccess,
+      transitDependency,
+      disadvantaged,
+    };
+  });
+
+  const disadvantagedTracts = tractFlags.filter((t) => t.disadvantaged).length;
+  const lowIncomeTracts = tractFlags.filter((t) => t.lowIncome).length;
+  const highPovertyTracts = tractFlags.filter((t) => t.highPoverty).length;
+  const highMinorityTracts = tractFlags.filter((t) => t.highMinority).length;
+  const lowVehicleAccessTracts = tractFlags.filter((t) => t.lowVehicleAccess).length;
+  const highTransitDependencyTracts = tractFlags.filter((t) => t.transitDependency).length;
+  const burdenedLowIncomeTracts = tractFlags.filter(
+    (t) =>
+      t.lowIncome &&
+      (t.highPoverty || t.highMinority || t.lowVehicleAccess || t.transitDependency)
+  ).length;
+
+  const pctDisadvantaged = pct(disadvantagedTracts, tracts.length);
+
   const ejIndicators = {
     lowIncome:
-      censusData.medianIncomeWeighted !== null && censusData.medianIncomeWeighted < 50000,
-    highMinority: censusData.pctMinority > 40,
-    linguisticallyIsolated: false, // would need ACS B16002 data; omit for MVP
-    highPoverty: censusData.pctBelowPoverty > 20,
-    lowVehicleAccess: censusData.pctZeroVehicle > 10,
-    transitDependent: censusData.pctTransit > 15,
+      censusData.medianIncomeWeighted !== null &&
+      censusData.medianIncomeWeighted < THRESHOLDS.lowIncomeMedian,
+    highMinority: censusData.pctMinority >= 40,
+    linguisticallyIsolated: false,
+    highPoverty: censusData.pctBelowPoverty >= 20,
+    lowVehicleAccess: censusData.pctZeroVehicle >= 10,
+    transitDependent: censusData.pctTransit >= 12,
   };
 
-  // Title VI flags — call out specific concerns for grant applications
   const title6Flags: string[] = [];
-  if (ejIndicators.highMinority)
+  if (ejIndicators.highMinority) {
     title6Flags.push("Corridor serves a high proportion of minority residents");
-  if (ejIndicators.lowIncome)
-    title6Flags.push("Median household income is below the 65th percentile threshold");
-  if (ejIndicators.highPoverty)
-    title6Flags.push("Poverty rate exceeds 20% — qualifies as a high-poverty area");
-  if (ejIndicators.lowVehicleAccess)
-    title6Flags.push("Significant proportion of households lack vehicle access");
-  if (ejIndicators.transitDependent)
-    title6Flags.push("High transit dependency indicates need for multimodal investment");
+  }
+  if (ejIndicators.lowIncome) {
+    title6Flags.push("Corridor median household income is below CEJST-proxy low-income threshold");
+  }
+  if (ejIndicators.highPoverty) {
+    title6Flags.push("Corridor poverty rate indicates concentrated economic burden");
+  }
+  if (ejIndicators.lowVehicleAccess) {
+    title6Flags.push("A significant share of households lacks vehicle access");
+  }
+  if (ejIndicators.transitDependent) {
+    title6Flags.push("Transit-dependent households indicate strong multimodal investment need");
+  }
 
-  // Justice40 eligibility: any disadvantaged tract in the corridor
-  const justice40Eligible = disadvantagedCount > 0;
+  const justice40Eligible = disadvantagedTracts > 0;
 
-  // Composite equity score: higher = MORE equitable need (i.e., higher priority for investment)
-  // Inverted so that higher disadvantage = higher score = higher priority
-  const factors = [
-    censusData.pctMinority > 50 ? 20 : censusData.pctMinority > 30 ? 12 : 5,
-    censusData.pctBelowPoverty > 25 ? 20 : censusData.pctBelowPoverty > 15 ? 12 : 5,
-    censusData.pctZeroVehicle > 15 ? 20 : censusData.pctZeroVehicle > 8 ? 12 : 5,
-    pctDisadvantaged > 50 ? 20 : pctDisadvantaged > 25 ? 12 : 5,
-    ejIndicators.lowIncome ? 10 : 3,
-    ejIndicators.transitDependent ? 10 : 3,
-  ];
-  const equityScore = Math.min(100, factors.reduce((s, f) => s + f, 0));
+  const equityScore = Math.min(
+    100,
+    Math.round(
+      pctDisadvantaged * 0.4 +
+        pct(highPovertyTracts, tracts.length) * 0.2 +
+        pct(lowVehicleAccessTracts, tracts.length) * 0.2 +
+        pct(highTransitDependencyTracts, tracts.length) * 0.2
+    )
+  );
 
   return {
     totalTracts: tracts.length,
-    disadvantagedTracts: disadvantagedCount,
+    disadvantagedTracts,
     pctDisadvantaged,
+    lowIncomeTracts,
+    highPovertyTracts,
+    highMinorityTracts,
+    lowVehicleAccessTracts,
+    highTransitDependencyTracts,
+    burdenedLowIncomeTracts,
     ejIndicators,
     title6Flags,
     justice40Eligible,
     equityScore,
-    source: "census-derived",
+    source: "cejst-proxy-census",
   };
 }
