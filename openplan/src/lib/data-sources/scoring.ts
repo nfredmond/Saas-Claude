@@ -15,6 +15,7 @@ import type { CensusSummary } from "./census";
 import type { LODESSummary } from "./lodes";
 import type { CrashSummary } from "./crashes";
 import type { EquityScreening } from "./equity";
+import type { TransitAccessSummary } from "./transit";
 
 export interface CorridorScores {
   accessibilityScore: number;
@@ -42,25 +43,35 @@ function clamp(val: number, min = 0, max = 100): number {
  * Higher jobs-per-resident ratio → higher score
  * Lower zero-vehicle rate with good alternatives → higher score
  */
-function computeAccessibility(census: CensusSummary, lodes: LODESSummary): number {
+function computeAccessibility(
+  census: CensusSummary,
+  lodes: LODESSummary,
+  transit: TransitAccessSummary
+): number {
   // Multimodal share: transit + walk + bike as % of total commuters
   const multimodalShare = census.pctTransit + census.pctWalk + census.pctBike;
 
-  // Score components (each 0-25, sum to 100 max)
-  const multimodalComponent = Math.min(25, multimodalShare * 0.8);
-  const jobAccessComponent = Math.min(25, lodes.jobsPerResident * 40);
-  const transitComponent = Math.min(25, census.pctTransit * 1.5);
+  // Score components (20 each + transit coverage 20)
+  const multimodalComponent = Math.min(20, multimodalShare * 0.7);
+  const jobAccessComponent = Math.min(20, lodes.jobsPerResident * 32);
+  const commuteTransitComponent = Math.min(20, census.pctTransit * 1.2);
+  const stopDensityComponent = Math.min(20, transit.stopsPerSqMile * 2.2);
 
   // Vehicle independence: areas where people CAN get around without a car
-  const vehicleIndependence = Math.min(25,
-    (census.pctZeroVehicle > 5 && multimodalShare > 15)
-      ? 20
-      : (census.pctZeroVehicle > 3 && multimodalShare > 8)
-        ? 12
-        : 5
-  );
+  const vehicleIndependence =
+    census.pctZeroVehicle > 5 && multimodalShare > 15
+      ? 16
+      : census.pctZeroVehicle > 3 && multimodalShare > 8
+        ? 10
+        : 4;
 
-  return clamp(multimodalComponent + jobAccessComponent + transitComponent + vehicleIndependence);
+  return clamp(
+    multimodalComponent +
+      jobAccessComponent +
+      commuteTransitComponent +
+      stopDensityComponent +
+      vehicleIndependence
+  );
 }
 
 /**
@@ -101,10 +112,11 @@ function computeEquity(equity: EquityScreening): number {
 export function computeCorridorScores(
   census: CensusSummary,
   lodes: LODESSummary,
+  transit: TransitAccessSummary,
   crashes: CrashSummary,
   equity: EquityScreening
 ): CorridorScores {
-  const accessibilityScore = computeAccessibility(census, lodes);
+  const accessibilityScore = computeAccessibility(census, lodes, transit);
   const safetyScore = computeSafety(crashes);
   const equityScore = computeEquity(equity);
 

@@ -30,6 +30,11 @@ type AnalysisResult = {
     accessibilityScore: number;
     safetyScore: number;
     equityScore: number;
+    overallScore?: number;
+    confidence?: string;
+    totalTransitStops?: number;
+    transitAccessTier?: string;
+    [key: string]: unknown;
   };
   geojson: GeoJSON.FeatureCollection;
   summary: string;
@@ -298,6 +303,12 @@ export default function ExplorePage() {
                 <Badge variant="outline">Accessibility: {analysisResult.metrics.accessibilityScore}</Badge>
                 <Badge variant="outline">Safety: {analysisResult.metrics.safetyScore}</Badge>
                 <Badge variant="outline">Equity: {analysisResult.metrics.equityScore}</Badge>
+                {typeof analysisResult.metrics.overallScore === "number" ? (
+                  <Badge variant="outline">Overall: {analysisResult.metrics.overallScore}</Badge>
+                ) : null}
+                {analysisResult.metrics.transitAccessTier ? (
+                  <Badge variant="outline">Transit Access: {String(analysisResult.metrics.transitAccessTier)}</Badge>
+                ) : null}
               </div>
               <p className="text-xs text-muted-foreground">Run ID: {analysisResult.runId}</p>
             </CardContent>

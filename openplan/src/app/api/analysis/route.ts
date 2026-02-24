@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 import { fetchCensusForCorridor, bboxFromGeojson } from "@/lib/data-sources/census";
 import { fetchLODESForCorridor } from "@/lib/data-sources/lodes";
 import { fetchCrashesForBbox } from "@/lib/data-sources/crashes";
+import { fetchTransitAccessForBbox } from "@/lib/data-sources/transit";
 import { screenEquity } from "@/lib/data-sources/equity";
 import { computeCorridorScores } from "@/lib/data-sources/scoring";
 
@@ -62,6 +63,7 @@ function formatCurrency(n: number | null): string {
 function generateSummary(
   census: Awaited<ReturnType<typeof fetchCensusForCorridor>>,
   lodes: Awaited<ReturnType<typeof fetchLODESForCorridor>>,
+  transit: Awaited<ReturnType<typeof fetchTransitAccessForBbox>>,
   crashes: Awaited<ReturnType<typeof fetchCrashesForBbox>>,
   equity: ReturnType<typeof screenEquity>,
   scores: ReturnType<typeof computeCorridorScores>
@@ -89,6 +91,13 @@ function generateSummary(
   lines.push(
     `**Employment:** ~${lodes.totalJobs.toLocaleString()} jobs in the corridor area ` +
       `(${lodes.jobsPerResident} jobs per resident). Source: ${lodes.source}.`
+  );
+
+  // Transit access
+  lines.push(
+    `**Transit Access:** ${transit.totalStops} stops/stations (${transit.stopsPerSqMile}/sq mi), ` +
+      `including ${transit.busStops} bus stops, ${transit.railStations} rail stations, ` +
+      `${transit.ferryStops} ferry terminals. Access tier: ${transit.accessTier}.`
   );
 
   // Safety
@@ -137,9 +146,10 @@ export async function POST(request: NextRequest) {
   const corridorForApi = corridorGeojson as { type: string; coordinates: number[][][] | number[][][][] };
   const bbox = bboxFromGeojson(corridorForApi);
 
-  // Run Census and crash fetches in parallel
-  const [census, crashes] = await Promise.all([
+  // Run Census, transit access, and crash fetches in parallel
+  const [census, transit, crashes] = await Promise.all([
     fetchCensusForCorridor(corridorForApi),
+    fetchTransitAccessForBbox(bbox),
     fetchCrashesForBbox(bbox),
   ]);
 
@@ -154,7 +164,7 @@ export async function POST(request: NextRequest) {
   const equity = screenEquity(census);
 
   // Compute composite scores
-  const scores = computeCorridorScores(census, lodes, crashes, equity);
+  const scores = computeCorridorScores(census, lodes, transit, crashes, equity);
 
   // Build result GeoJSON
   const geojson = {
@@ -170,7 +180,7 @@ export async function POST(request: NextRequest) {
   };
 
   // Generate human-readable summary
-  const summary = generateSummary(census, lodes, crashes, equity, scores);
+  const summary = generateSummary(census, lodes, transit, crashes, equity, scores);
 
   // Build metrics object
   const metrics = {
@@ -198,6 +208,14 @@ export async function POST(request: NextRequest) {
     // Employment
     totalJobs: lodes.totalJobs,
     jobsPerResident: lodes.jobsPerResident,
+
+    // Transit access
+    totalTransitStops: transit.totalStops,
+    busStops: transit.busStops,
+    railStations: transit.railStations,
+    ferryStops: transit.ferryStops,
+    stopsPerSquareMile: transit.stopsPerSqMile,
+    transitAccessTier: transit.accessTier,
 
     // Safety
     totalFatalCrashes: crashes.totalFatalCrashes,

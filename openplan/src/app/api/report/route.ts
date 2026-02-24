@@ -173,6 +173,18 @@ ${scoreBar(Number(m.overallScore) || 0, "Overall Composite Score")}
   <tr><td>Jobs per Resident</td><td>${m.jobsPerResident ?? "N/A"}</td></tr>
 </table>
 
+<!-- TRANSIT ACCESS -->
+<h2>Transit Access</h2>
+<table>
+  <tr><th>Metric</th><th>Value</th></tr>
+  <tr><td>Total Transit Stops / Stations</td><td>${fmt(m.totalTransitStops as number)}</td></tr>
+  <tr><td>Bus Stops</td><td>${fmt(m.busStops as number)}</td></tr>
+  <tr><td>Rail Stations</td><td>${fmt(m.railStations as number)}</td></tr>
+  <tr><td>Ferry Terminals</td><td>${fmt(m.ferryStops as number)}</td></tr>
+  <tr><td>Stops per Square Mile</td><td>${m.stopsPerSquareMile ?? "N/A"}</td></tr>
+  <tr><td>Transit Access Tier</td><td>${esc(String(m.transitAccessTier ?? "N/A"))}</td></tr>
+</table>
+
 <!-- SAFETY -->
 <h2>Safety Analysis</h2>
 <table>
