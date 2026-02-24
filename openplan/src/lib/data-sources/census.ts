@@ -65,6 +65,7 @@ interface BBox {
 const CENSUS_BASE = "https://api.census.gov/data";
 const ACS_YEAR = "2023"; // latest 5-year ACS
 const ACS_DATASET = "acs/acs5";
+const CENSUS_API_KEY = process.env.CENSUS_API_KEY;
 
 const VARIABLES = [
   "B01003_001E", // total pop
@@ -169,7 +170,8 @@ async function fetchAcsForCounties(
     try {
       const url =
         `${CENSUS_BASE}/${ACS_YEAR}/${ACS_DATASET}?get=NAME,${VARIABLES}` +
-        `&for=tract:*&in=state:${state}%20county:${county}`;
+        `&for=tract:*&in=state:${state}%20county:${county}` +
+        (CENSUS_API_KEY ? `&key=${encodeURIComponent(CENSUS_API_KEY)}` : "");
 
       const resp = await fetch(url);
       if (!resp.ok) continue;
