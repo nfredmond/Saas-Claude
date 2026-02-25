@@ -24,7 +24,7 @@ CREATE TABLE analyses (
   result_geojson JSONB,
   summary_text TEXT,
   is_public BOOLEAN DEFAULT false,
-  share_token TEXT UNIQUE DEFAULT encode(gen_random_bytes(16), 'hex'),
+  share_token TEXT UNIQUE DEFAULT substr(md5(random()::text || clock_timestamp()::text || gen_random_uuid()::text), 1, 32),
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX idx_analyses_workspace ON analyses(workspace_id);

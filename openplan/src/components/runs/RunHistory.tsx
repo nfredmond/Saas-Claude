@@ -4,15 +4,24 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-type Run = {
+export type Run = {
   id: string;
   title: string;
   query_text: string;
   created_at: string;
+  corridor_geojson?: GeoJSON.Polygon | GeoJSON.MultiPolygon | null;
+  metrics?: Record<string, unknown> | null;
+  result_geojson?: GeoJSON.FeatureCollection | null;
+  summary_text?: string | null;
+  ai_interpretation?: string | null;
 };
 
 type RunHistoryProps = {
   workspaceId: string;
+  onLoadRun?: (run: Run) => void;
+  onCompareRun?: (run: Run) => void;
+  currentRunId?: string;
+  comparisonRunId?: string;
 };
 
 function formatDate(value: string): string {
@@ -24,7 +33,13 @@ function formatDate(value: string): string {
   return parsed.toLocaleString();
 }
 
-export function RunHistory({ workspaceId }: RunHistoryProps) {
+export function RunHistory({
+  workspaceId,
+  onLoadRun,
+  onCompareRun,
+  currentRunId,
+  comparisonRunId,
+}: RunHistoryProps) {
   const [runs, setRuns] = useState<Run[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -95,20 +110,58 @@ export function RunHistory({ workspaceId }: RunHistoryProps) {
           <p className="text-sm text-muted-foreground">No runs yet. Submit an analysis to populate history.</p>
         ) : null}
 
-        {runs.map((run) => (
-          <article key={run.id} className="rounded-md border border-border p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold">{run.title}</p>
-                <p className="line-clamp-2 text-xs text-muted-foreground">{run.query_text}</p>
-                <p className="text-xs text-muted-foreground">{formatDate(run.created_at)}</p>
+        {runs.map((run) => {
+          const isCurrent = run.id === currentRunId;
+          const isComparison = run.id === comparisonRunId;
+
+          return (
+            <article
+              key={run.id}
+              className={`rounded-md border p-3 ${
+                isCurrent
+                  ? "border-foreground/30 bg-muted/30"
+                  : isComparison
+                    ? "border-blue-500/40 bg-blue-500/5"
+                    : "border-border"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">{run.title}</p>
+                  <p className="line-clamp-2 text-xs text-muted-foreground">{run.query_text}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(run.created_at)}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {onLoadRun ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onLoadRun(run)}
+                      disabled={isCurrent}
+                    >
+                      {isCurrent ? "Loaded" : "Load"}
+                    </Button>
+                  ) : null}
+                  {onCompareRun ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onCompareRun(run)}
+                      disabled={isCurrent || !run.metrics}
+                    >
+                      {isComparison ? "Comparing" : "Compare"}
+                    </Button>
+                  ) : null}
+                  <Button type="button" variant="destructive" size="sm" onClick={() => void deleteRun(run.id)}>
+                    Delete
+                  </Button>
+                </div>
               </div>
-              <Button type="button" variant="destructive" size="sm" onClick={() => void deleteRun(run.id)}>
-                Delete
-              </Button>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </CardContent>
     </Card>
   );

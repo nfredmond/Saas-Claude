@@ -99,7 +99,7 @@ Small/rural transportation agencies, tribal transportation programs, and small c
 - [ ] Sign-out + session management
 - [ ] Wire real Census/ACS API calls into analysis endpoint
 - [ ] Wire LEHD/LODES data lookup
-- [ ] Basic smoke tests
+- [x] Basic smoke tests
 
 ### Phase B — Real Analysis Engine (Weeks 3-5)
 - [ ] GTFS feed ingestion for transit accessibility

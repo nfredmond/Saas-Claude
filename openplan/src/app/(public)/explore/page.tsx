@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import maplibregl, { LngLatBoundsLike, Map } from "maplibre-gl";
 import { CorridorUpload } from "@/components/corridor/CorridorUpload";
+import type { Run } from "@/components/runs/RunHistory";
 import { RunHistory } from "@/components/runs/RunHistory";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { buildMetricDeltas, deltaTone, formatDelta } from "@/lib/analysis/compare";
+import { downloadGeojson, downloadMetricsCsv } from "@/lib/export/download";
 
 type Position = [number, number] | [number, number, number];
 
@@ -48,6 +51,14 @@ type AnalysisResult = {
   aiInterpretationSource?: string;
 };
 
+type CurrentWorkspaceResponse = {
+  workspaceId: string;
+  name: string | null;
+  role: string;
+};
+
+type WorkspaceLoadState = "loading" | "loaded" | "signedOut" | "noMembership" | "error";
+
 function collectPositions(geometry: CorridorGeometry): Position[] {
   if (geometry.type === "Polygon") {
     return geometry.coordinates.flat();
@@ -81,6 +92,11 @@ function getBoundsFromGeometry(geometry: CorridorGeometry): LngLatBoundsLike | n
   ];
 }
 
+function formatRunTimestamp(value: string): string {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
 export default function ExplorePage() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
@@ -89,9 +105,13 @@ export default function ExplorePage() {
   const [queryText, setQueryText] = useState("");
   const [corridorGeojson, setCorridorGeojson] = useState<CorridorGeometry | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [comparisonRun, setComparisonRun] = useState<Run | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [error, setError] = useState("");
+  const [workspaceLoadState, setWorkspaceLoadState] = useState<WorkspaceLoadState>("loading");
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
+  const [workspaceRole, setWorkspaceRole] = useState<string | null>(null);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) {
@@ -158,6 +178,56 @@ export default function ExplorePage() {
   }, []);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    async function loadCurrentWorkspace() {
+      setWorkspaceLoadState("loading");
+
+      try {
+        const response = await fetch("/api/workspaces/current", { method: "GET" });
+
+        if (response.status === 401) {
+          if (!isCancelled) {
+            setWorkspaceLoadState("signedOut");
+          }
+          return;
+        }
+
+        if (response.status === 404) {
+          if (!isCancelled) {
+            setWorkspaceLoadState("noMembership");
+          }
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Failed to auto-load workspace.");
+        }
+
+        const payload = (await response.json()) as CurrentWorkspaceResponse;
+        if (isCancelled) {
+          return;
+        }
+
+        setWorkspaceId(payload.workspaceId);
+        setWorkspaceName(payload.name);
+        setWorkspaceRole(payload.role);
+        setWorkspaceLoadState("loaded");
+      } catch {
+        if (!isCancelled) {
+          setWorkspaceLoadState("error");
+        }
+      }
+    }
+
+    void loadCurrentWorkspace();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!analysisResult || !mapRef.current) {
       return;
     }
@@ -219,6 +289,36 @@ export default function ExplorePage() {
     }
   };
 
+  const loadRun = useCallback(
+    (run: Run) => {
+      setQueryText(run.query_text);
+
+      if (run.corridor_geojson) {
+        setCorridorGeojson(run.corridor_geojson as CorridorGeometry);
+      }
+
+      if (!run.metrics || !run.result_geojson || !run.summary_text) {
+        setError("Selected run is missing result data and cannot be loaded.");
+        return;
+      }
+
+      if (comparisonRun?.id === run.id) {
+        setComparisonRun(null);
+      }
+
+      setError("");
+      setAnalysisResult({
+        runId: run.id,
+        metrics: run.metrics as AnalysisResult["metrics"],
+        geojson: run.result_geojson,
+        summary: run.summary_text,
+        aiInterpretation: run.ai_interpretation ?? undefined,
+        aiInterpretationSource: run.ai_interpretation ? "ai" : "fallback",
+      });
+    },
+    [comparisonRun?.id]
+  );
+
   const generateReport = async () => {
     if (!analysisResult?.runId) {
       setError("Run an analysis before generating a report.");
@@ -258,6 +358,83 @@ export default function ExplorePage() {
     }
   };
 
+  const exportMetrics = () => {
+    if (!analysisResult) {
+      return;
+    }
+
+    try {
+      downloadMetricsCsv(analysisResult.metrics, `openplan-${analysisResult.runId}-metrics.csv`);
+    } catch {
+      setError("Failed to export metrics CSV.");
+    }
+  };
+
+  const exportGeojson = () => {
+    if (!analysisResult) {
+      return;
+    }
+
+    try {
+      downloadGeojson(analysisResult.geojson, `openplan-${analysisResult.runId}-result.geojson`);
+    } catch {
+      setError("Failed to export result GeoJSON.");
+    }
+  };
+
+  const compareRun = useCallback(
+    (run: Run) => {
+      if (!analysisResult) {
+        setError("Load or run an analysis first, then choose a comparison run.");
+        return;
+      }
+
+      if (run.id === analysisResult.runId) {
+        setError("Choose a different run to compare.");
+        return;
+      }
+
+      if (!run.metrics) {
+        setError("Selected run has no metrics available for comparison.");
+        return;
+      }
+
+      setError("");
+      setComparisonRun(run);
+    },
+    [analysisResult]
+  );
+
+  const comparisonDeltas = useMemo(() => {
+    if (!analysisResult || !comparisonRun?.metrics) {
+      return [];
+    }
+
+    return buildMetricDeltas(analysisResult.metrics, comparisonRun.metrics);
+  }, [analysisResult, comparisonRun]);
+
+  const workspaceHelperText = useMemo(() => {
+    if (workspaceLoadState === "loading") {
+      return "Checking for your default workspace...";
+    }
+
+    if (workspaceLoadState === "signedOut") {
+      return "You are signed out. Enter a workspace ID manually to run analysis.";
+    }
+
+    if (workspaceLoadState === "noMembership") {
+      return "Signed in, but no workspace membership was found. Enter a workspace ID manually.";
+    }
+
+    if (workspaceLoadState === "loaded") {
+      const displayName = workspaceName ?? "workspace";
+      const role = workspaceRole ?? "member";
+      return `Auto-loaded ${displayName} as ${role}. You can override the workspace ID manually.`;
+    }
+
+    return "Could not auto-load a workspace. Enter a workspace ID manually.";
+  }, [workspaceLoadState, workspaceName, workspaceRole]);
+
   return (
     <section className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
       <div className="overflow-hidden rounded-lg border border-border">
@@ -276,6 +453,7 @@ export default function ExplorePage() {
               onChange={(event) => setWorkspaceId(event.target.value)}
               placeholder="Workspace UUID"
             />
+            <p className="text-xs text-muted-foreground">{workspaceHelperText}</p>
             <CorridorUpload onUpload={(geojson) => setCorridorGeojson(geojson)} />
             <Textarea
               value={queryText}
@@ -327,6 +505,15 @@ export default function ExplorePage() {
                   ) : null}
                 </div>
 
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" onClick={exportMetrics}>
+                    Export Metrics CSV
+                  </Button>
+                  <Button type="button" variant="outline" onClick={exportGeojson}>
+                    Export Result GeoJSON
+                  </Button>
+                </div>
+
                 <div className="space-y-1">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Summary</p>
                   <p className="text-sm text-foreground">{analysisResult.summary}</p>
@@ -361,6 +548,49 @@ export default function ExplorePage() {
               </CardContent>
             </Card>
 
+            {comparisonRun && comparisonRun.metrics ? (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle>Run Comparison</CardTitle>
+                  <CardDescription>
+                    Comparing current run against baseline: {comparisonRun.title} ({formatRunTimestamp(comparisonRun.created_at)})
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {comparisonDeltas.map((delta) => {
+                    const tone = deltaTone(delta.delta);
+                    const toneClass =
+                      tone === "up"
+                        ? "text-emerald-700"
+                        : tone === "down"
+                          ? "text-rose-700"
+                          : "text-muted-foreground";
+
+                    return (
+                      <div key={delta.key} className="rounded-md border border-border p-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium">{delta.label}</p>
+                          <p className={`text-sm font-semibold ${toneClass}`}>
+                            {formatDelta(delta.delta)}
+                            {delta.deltaPct !== null ? ` (${formatDelta(delta.deltaPct)}%)` : ""}
+                          </p>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Current: {delta.current ?? "N/A"} · Baseline: {delta.baseline ?? "N/A"}
+                        </p>
+                      </div>
+                    );
+                  })}
+
+                  <div className="flex justify-end">
+                    <Button type="button" variant="ghost" onClick={() => setComparisonRun(null)}>
+                      Clear Comparison
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle>Methods &amp; Assumptions + AI Disclosure</CardTitle>
@@ -388,7 +618,13 @@ export default function ExplorePage() {
           </>
         ) : null}
 
-        <RunHistory workspaceId={workspaceId} />
+        <RunHistory
+          workspaceId={workspaceId}
+          onLoadRun={loadRun}
+          onCompareRun={compareRun}
+          currentRunId={analysisResult?.runId}
+          comparisonRunId={comparisonRun?.id}
+        />
       </div>
     </section>
   );
