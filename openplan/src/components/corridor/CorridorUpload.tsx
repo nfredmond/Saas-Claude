@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorState } from "@/components/ui/state-block";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 
 type Position = [number, number] | [number, number, number];
@@ -109,10 +111,10 @@ export function CorridorUpload({ onUpload }: CorridorUploadProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle>Corridor Upload</CardTitle>
-        <CardDescription>Upload a Polygon or MultiPolygon `.geojson` corridor file.</CardDescription>
+        <CardTitle>Corridor Geometry</CardTitle>
+        <CardDescription>Upload a Polygon or MultiPolygon `.geojson` file for analysis.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3.5">
         <Input
           ref={inputRef}
           type="file"
@@ -126,10 +128,15 @@ export function CorridorUpload({ onUpload }: CorridorUploadProps) {
           }}
         />
         <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
-          Upload .geojson
+          Select GeoJSON File
         </Button>
-        {fileName ? <p className="text-xs text-muted-foreground">Loaded: {fileName}</p> : null}
-        {error ? <p className="text-xs text-destructive">{error}</p> : null}
+        {fileName ? (
+          <div className="space-y-1">
+            <StatusBadge tone="success">File loaded</StatusBadge>
+            <p className="text-[0.72rem] uppercase tracking-[0.08em] text-muted-foreground">{fileName}</p>
+          </div>
+        ) : null}
+        {error ? <ErrorState compact title="Upload issue" description={error} /> : null}
       </CardContent>
     </Card>
   );

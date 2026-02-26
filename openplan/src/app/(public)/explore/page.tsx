@@ -8,10 +8,13 @@ import { RunHistory } from "@/components/runs/RunHistory";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState, ErrorState } from "@/components/ui/state-block";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { buildMetricDeltas, deltaTone, formatDelta } from "@/lib/analysis/compare";
 import { downloadGeojson, downloadMetricsCsv } from "@/lib/export/download";
+import { resolveStatusTone, toneFromBoolean, toneFromDelta } from "@/lib/ui/status";
 
 type Position = [number, number] | [number, number, number];
 
@@ -460,55 +463,78 @@ export default function ExplorePage() {
 
   const workspaceHelperText = useMemo(() => {
     if (workspaceLoadState === "loading") {
-      return "Checking for your default workspace...";
+      return "Checking your default workspace and permissions...";
     }
 
     if (workspaceLoadState === "signedOut") {
-      return "You are signed out. Enter a workspace ID manually to run analysis.";
+      return "You are signed out. Enter a workspace ID manually, or sign in to continue.";
     }
 
     if (workspaceLoadState === "noMembership") {
-      return "Signed in, but no workspace membership was found. Enter a workspace ID manually.";
+      return "Signed in, but no workspace membership was detected. Enter a workspace ID manually.";
     }
 
     if (workspaceLoadState === "loaded") {
       const displayName = workspaceName ?? "workspace";
       const role = workspaceRole ?? "member";
-      return `Auto-loaded ${displayName} as ${role}. You can override the workspace ID manually.`;
+      return `Connected to ${displayName} (${role}). You can override the workspace ID if needed.`;
     }
 
-    return "Could not auto-load a workspace. Enter a workspace ID manually.";
+    return "Unable to auto-load a workspace right now. Enter a workspace ID manually.";
   }, [workspaceLoadState, workspaceName, workspaceRole]);
 
+  const workspaceStatusLabel = useMemo(() => {
+    if (workspaceLoadState === "loading") {
+      return "Loading";
+    }
+
+    if (workspaceLoadState === "loaded") {
+      return "Workspace loaded";
+    }
+
+    if (workspaceLoadState === "signedOut") {
+      return "Signed out";
+    }
+
+    if (workspaceLoadState === "noMembership") {
+      return "No membership";
+    }
+
+    return "Connection issue";
+  }, [workspaceLoadState]);
+
   return (
-    <section className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
-      <div className="overflow-hidden rounded-lg border border-border">
+    <section className="grid gap-5 lg:grid-cols-[1.45fr_1fr]">
+      <div className="overflow-hidden rounded-2xl border border-border/80 shadow-[0_10px_30px_rgba(20,33,43,0.08)]">
         <div ref={mapContainerRef} className="h-[560px] w-full" />
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle>Analysis Workspace</CardTitle>
-            <CardDescription>Upload a corridor, enter a prompt, and run a grant-ready corridor analysis.</CardDescription>
+            <CardTitle>Corridor Analysis Studio</CardTitle>
+            <CardDescription>Upload a corridor, frame the planning question, and generate grant-ready outputs.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3.5">
             <Input
               value={workspaceId}
               onChange={(event) => setWorkspaceId(event.target.value)}
               placeholder="Workspace UUID"
             />
-            <p className="text-xs text-muted-foreground">{workspaceHelperText}</p>
+            <div className="space-y-2">
+              <StatusBadge tone={resolveStatusTone(workspaceLoadState)}>{workspaceStatusLabel}</StatusBadge>
+              <p className="text-xs text-muted-foreground">{workspaceHelperText}</p>
+            </div>
             <CorridorUpload onUpload={(geojson) => setCorridorGeojson(geojson)} />
             <Textarea
               value={queryText}
               onChange={(event) => setQueryText(event.target.value)}
-              placeholder="Example: Evaluate transit accessibility and safety concerns for this corridor."
+              placeholder="Example: Evaluate transit accessibility, safety risk, and equity implications for this corridor."
               rows={4}
             />
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={() => void runAnalysis()} disabled={!canSubmit || isSubmitting}>
-                {isSubmitting ? "Running..." : "Run Analysis"}
+                {isSubmitting ? "Running analysis..." : "Run Corridor Analysis"}
               </Button>
               <Button
                 type="button"
@@ -516,7 +542,7 @@ export default function ExplorePage() {
                 onClick={() => void generateReport()}
                 disabled={!analysisResult?.runId || isGeneratingReport}
               >
-                {isGeneratingReport ? "Generating..." : "Generate Report"}
+                {isGeneratingReport ? "Generating report..." : "Open HTML Report"}
               </Button>
               <Button
                 type="button"
@@ -524,10 +550,10 @@ export default function ExplorePage() {
                 onClick={() => void downloadPdfReport()}
                 disabled={!analysisResult?.runId || isDownloadingPdf}
               >
-                {isDownloadingPdf ? "Downloading..." : "Download PDF"}
+                {isDownloadingPdf ? "Preparing PDF..." : "Download PDF Report"}
               </Button>
             </div>
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {error ? <ErrorState compact title="Please review" description={error} /> : null}
           </CardContent>
         </Card>
 
@@ -535,11 +561,11 @@ export default function ExplorePage() {
           <>
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle>Latest Result</CardTitle>
+                <CardTitle>Latest Analysis Result</CardTitle>
                 <CardDescription>
                   {analysisResult.aiInterpretationSource === "ai"
-                    ? "AI-enhanced interpretation generated."
-                    : "Interpretation generated using deterministic fallback summary."}
+                    ? "Interpretation includes AI-assisted narrative support (human review required)."
+                    : "Interpretation generated from deterministic fallback logic."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -551,10 +577,14 @@ export default function ExplorePage() {
                     <Badge variant="outline">Overall: {analysisResult.metrics.overallScore}</Badge>
                   ) : null}
                   {analysisResult.metrics.transitAccessTier ? (
-                    <Badge variant="outline">Transit Access: {String(analysisResult.metrics.transitAccessTier)}</Badge>
+                    <StatusBadge tone={resolveStatusTone(String(analysisResult.metrics.transitAccessTier))}>
+                      Transit Access: {String(analysisResult.metrics.transitAccessTier)}
+                    </StatusBadge>
                   ) : null}
                   {analysisResult.metrics.confidence ? (
-                    <Badge variant="outline">Confidence: {String(analysisResult.metrics.confidence)}</Badge>
+                    <StatusBadge tone={resolveStatusTone(String(analysisResult.metrics.confidence))}>
+                      Confidence: {String(analysisResult.metrics.confidence)}
+                    </StatusBadge>
                   ) : null}
                 </div>
 
@@ -582,18 +612,22 @@ export default function ExplorePage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Data Quality</p>
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline">
+                    <StatusBadge tone={toneFromBoolean(analysisResult.metrics.dataQuality?.censusAvailable, "success", "warning")}>
                       Census: {analysisResult.metrics.dataQuality?.censusAvailable ? "Live" : "Unavailable"}
-                    </Badge>
-                    <Badge variant="outline">
+                    </StatusBadge>
+                    <StatusBadge tone={toneFromBoolean(analysisResult.metrics.dataQuality?.crashDataAvailable, "success", "info")}>
                       Crashes: {analysisResult.metrics.dataQuality?.crashDataAvailable ? "Live" : "Estimated"}
-                    </Badge>
-                    <Badge variant="outline">
+                    </StatusBadge>
+                    <StatusBadge tone={resolveStatusTone(String(analysisResult.metrics.dataQuality?.lodesSource ?? "unknown"))}>
                       LODES: {String(analysisResult.metrics.dataQuality?.lodesSource ?? "unknown")}
-                    </Badge>
-                    <Badge variant="outline">
+                    </StatusBadge>
+                    <StatusBadge
+                      tone={resolveStatusTone(
+                        String(analysisResult.metrics.dataQuality?.equitySource ?? analysisResult.metrics["equitySource"] ?? "unknown")
+                      )}
+                    >
                       Equity: {String(analysisResult.metrics.dataQuality?.equitySource ?? analysisResult.metrics["equitySource"] ?? "unknown")}
-                    </Badge>
+                    </StatusBadge>
                   </div>
                 </div>
 
@@ -606,27 +640,26 @@ export default function ExplorePage() {
                 <CardHeader className="pb-3">
                   <CardTitle>Run Comparison</CardTitle>
                   <CardDescription>
-                    Comparing current run against baseline: {comparisonRun.title} ({formatRunTimestamp(comparisonRun.created_at)})
+                    Current run vs baseline: {comparisonRun.title} ({formatRunTimestamp(comparisonRun.created_at)})
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {comparisonDeltas.map((delta) => {
-                    const tone = deltaTone(delta.delta);
-                    const toneClass =
-                      tone === "up"
-                        ? "text-emerald-700"
-                        : tone === "down"
-                          ? "text-rose-700"
-                          : "text-muted-foreground";
+                    const normalizedDelta = delta.delta ?? 0;
+                    const directionTone = delta.delta === null ? "flat" : deltaTone(normalizedDelta);
+                    const statusTone = delta.delta === null ? "neutral" : toneFromDelta(normalizedDelta);
 
                     return (
-                      <div key={delta.key} className="rounded-md border border-border p-2">
+                      <div key={delta.key} className="rounded-xl border border-border/80 bg-background p-2.5">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-medium">{delta.label}</p>
-                          <p className={`text-sm font-semibold ${toneClass}`}>
-                            {formatDelta(delta.delta)}
-                            {delta.deltaPct !== null ? ` (${formatDelta(delta.deltaPct)}%)` : ""}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <StatusBadge tone={statusTone}>{directionTone === "flat" ? "No change" : directionTone === "up" ? "Up" : "Down"}</StatusBadge>
+                            <p className="text-sm font-semibold text-foreground">
+                              {formatDelta(delta.delta)}
+                              {delta.deltaPct !== null ? ` (${formatDelta(delta.deltaPct)}%)` : ""}
+                            </p>
+                          </div>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
                           Current: {delta.current ?? "N/A"} · Baseline: {delta.baseline ?? "N/A"}
@@ -646,7 +679,7 @@ export default function ExplorePage() {
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle>Methods &amp; Assumptions + AI Disclosure</CardTitle>
+                <CardTitle>Methods, Assumptions &amp; AI Disclosure</CardTitle>
                 <CardDescription>
                   Client-safe methodology notes for grant and planning workflows.
                 </CardDescription>
@@ -669,7 +702,20 @@ export default function ExplorePage() {
               </CardContent>
             </Card>
           </>
-        ) : null}
+        ) : (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>No analysis selected</CardTitle>
+              <CardDescription>Run a corridor analysis or load a prior run to review metrics, narrative output, and comparisons.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EmptyState
+                title="Ready for corridor analysis"
+                description="Upload a corridor, enter your planning question, and run the analysis to generate results."
+              />
+            </CardContent>
+          </Card>
+        )}
 
         <RunHistory
           workspaceId={workspaceId}

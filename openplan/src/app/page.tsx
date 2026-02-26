@@ -5,29 +5,29 @@ const quickLinks = [
     href: "/explore",
     title: "Run Corridor Analysis",
     description:
-      "Upload a corridor and generate safety, equity, and accessibility scoring with export-ready outputs.",
+      "Upload a corridor and generate accessibility, safety, and equity scoring with export-ready outputs.",
     eyebrow: "Planner workflow",
   },
   {
     href: "/dashboard",
     title: "Open Workspace Dashboard",
     description:
-      "Manage runs, revisit previous analyses, and keep planning artifacts organized in one workspace.",
+      "Review run history, reload prior analyses, and keep decision-ready outputs in one place.",
     eyebrow: "Workspace",
   },
   {
     href: "/sign-up",
     title: "Start a Pilot Workspace",
     description:
-      "Create an agency account and stand up a live OpenPlan environment for your next grant cycle.",
+      "Create an account and stand up a live OpenPlan workspace for your next grant cycle.",
     eyebrow: "Pilot ready",
   },
 ];
 
 const trustPoints = [
-  "Grant-oriented scoring (ATP / SS4A / RAISE framing)",
-  "Transparent methods and assumptions with disclosure-ready language",
-  "Exports for reports, review packets, and GIS handoff",
+  "Grant-oriented scoring aligned to ATP / SS4A / RAISE framing",
+  "Transparent methods and assumptions with client-safe disclosure language",
+  "Exports built for review packets, reports, and GIS handoff",
 ];
 
 export default function HomePage() {
@@ -47,7 +47,7 @@ export default function HomePage() {
             </h1>
             <p className="max-w-2xl text-sm text-slate-200/85 sm:text-base">
               OpenPlan helps transportation teams move from boundary file to defensible scoring, narrative summary,
-              and report packaging in minutes — while keeping methods transparent and reviewable.
+              and report packaging in minutes—while keeping methods transparent and reviewable.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
@@ -84,10 +84,10 @@ export default function HomePage() {
           <Link
             key={link.href}
             href={link.href}
-            className="group rounded-2xl border border-border/70 bg-card/80 p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-600/35 hover:shadow-lg hover:shadow-teal-900/10"
+            className="group rounded-2xl border border-border/70 bg-card/80 p-5 shadow-[0_10px_24px_rgba(20,33,43,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35"
           >
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{link.eyebrow}</p>
-            <h2 className="mt-2 text-base font-semibold text-foreground group-hover:text-teal-700 dark:group-hover:text-cyan-300">
+            <h2 className="mt-2 text-base font-semibold tracking-tight text-foreground group-hover:text-teal-700 dark:group-hover:text-cyan-300">
               {link.title}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">{link.description}</p>

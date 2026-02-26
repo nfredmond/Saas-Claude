@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state-block";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export type Run = {
   id: string;
@@ -99,15 +101,19 @@ export function RunHistory({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle>Run History</CardTitle>
-        <CardDescription>Recent analysis runs in this workspace.</CardDescription>
+        <CardTitle>Analysis Run History</CardTitle>
+        <CardDescription>Recent runs for this workspace, ready to reload or compare.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {isLoading ? <p className="text-sm text-muted-foreground">Loading runs...</p> : null}
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <CardContent className="space-y-3.5">
+        {isLoading ? <LoadingState compact label="Loading run history" description="Refreshing workspace records." /> : null}
+        {error ? <ErrorState compact title="Run history unavailable" description={error} /> : null}
 
         {!isLoading && !error && runs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No runs yet. Submit an analysis to populate history.</p>
+          <EmptyState
+            compact
+            title="No analysis runs yet"
+            description="Run your first corridor analysis to populate this timeline."
+          />
         ) : null}
 
         {runs.map((run) => {
@@ -117,21 +123,29 @@ export function RunHistory({
           return (
             <article
               key={run.id}
-              className={`rounded-md border p-3 ${
+              className={`rounded-xl border p-3.5 transition-colors ${
                 isCurrent
-                  ? "border-foreground/30 bg-muted/30"
+                  ? "border-[color:var(--pine)]/35 bg-[color:var(--pine)]/6"
                   : isComparison
-                    ? "border-blue-500/40 bg-blue-500/5"
-                    : "border-border"
+                    ? "border-[color:var(--accent)]/35 bg-[color:var(--accent)]/6"
+                    : "border-border/80 bg-background"
               }`}
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold">{run.title}</p>
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold tracking-tight">{run.title}</p>
+                    {isCurrent ? <StatusBadge tone="info">Current run</StatusBadge> : null}
+                    {isComparison ? <StatusBadge tone="neutral">Comparison baseline</StatusBadge> : null}
+                  </div>
+
                   <p className="line-clamp-2 text-xs text-muted-foreground">{run.query_text}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(run.created_at)}</p>
+                  <p className="text-[0.72rem] uppercase tracking-[0.08em] text-muted-foreground">
+                    {formatDate(run.created_at)}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
+
+                <div className="flex flex-wrap items-center justify-end gap-1.5">
                   {onLoadRun ? (
                     <Button
                       type="button"
@@ -155,7 +169,7 @@ export function RunHistory({
                     </Button>
                   ) : null}
                   <Button type="button" variant="destructive" size="sm" onClick={() => void deleteRun(run.id)}>
-                    Delete
+                    Delete run
                   </Button>
                 </div>
               </div>
