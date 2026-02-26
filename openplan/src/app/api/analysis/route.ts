@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { monthlyRunLimitForPlan, normalizeWorkspacePlan, runLimitMessage } from "@/lib/billing/limits";
 import { isWorkspaceSubscriptionActive, subscriptionGateMessage } from "@/lib/billing/subscription";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { fetchCensusForCorridor, bboxFromGeojson } from "@/lib/data-sources/census";
@@ -210,6 +211,50 @@ export async function POST(request: NextRequest) {
       });
 
       return NextResponse.json({ error: gateMessage }, { status: 402 });
+    }
+
+    const normalizedPlan = normalizeWorkspacePlan(
+      (workspaceBilling?.subscription_plan as string | undefined) ??
+        (workspaceBilling?.plan as string | undefined) ??
+        null
+    );
+
+    const monthlyLimit = monthlyRunLimitForPlan(normalizedPlan);
+    if (monthlyLimit !== null) {
+      const currentMonthStart = new Date();
+      currentMonthStart.setUTCDate(1);
+      currentMonthStart.setUTCHours(0, 0, 0, 0);
+
+      const { count: monthlyRuns, error: runCountError } = await userSupabase
+        .from("runs")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId)
+        .gte("created_at", currentMonthStart.toISOString());
+
+      if (runCountError) {
+        audit.error("run_limit_count_failed", {
+          workspaceId,
+          userId: user.id,
+          message: runCountError.message,
+          code: runCountError.code ?? null,
+        });
+
+        return NextResponse.json({ error: "Failed to validate plan limits" }, { status: 500 });
+      }
+
+      const usedRuns = monthlyRuns ?? 0;
+      if (usedRuns >= monthlyLimit) {
+        const limitMessage = runLimitMessage(normalizedPlan, usedRuns, monthlyLimit);
+        audit.warn("run_limit_reached", {
+          workspaceId,
+          userId: user.id,
+          plan: normalizedPlan,
+          usedRuns,
+          monthlyLimit,
+        });
+
+        return NextResponse.json({ error: limitMessage }, { status: 429 });
+      }
     }
 
     runId = crypto.randomUUID();
