@@ -13,10 +13,12 @@ export async function TopNav() {
     ? [
         { href: "/dashboard", label: "Dashboard" },
         { href: "/explore", label: "Explore" },
+        { href: "/pricing", label: "Pricing" },
       ]
     : [
         { href: "/", label: "Home" },
         { href: "/explore", label: "Explore" },
+        { href: "/pricing", label: "Pricing" },
         { href: "/sign-in", label: "Sign in" },
         { href: "/sign-up", label: "Sign up" },
       ];

@@ -1,0 +1,78 @@
+import Link from "next/link";
+import { StatusBadge } from "@/components/ui/status-badge";
+
+const plans = [
+  {
+    name: "Starter",
+    price: "$249/mo",
+    badge: "Pilot-ready",
+    features: [
+      "1 workspace",
+      "Up to 100 corridor runs/month",
+      "ATP + SS4A report templates",
+      "Run history and export telemetry",
+      "Email support (2-business-day target)",
+    ],
+    cta: "Start Starter Pilot",
+  },
+  {
+    name: "Professional",
+    price: "$799/mo",
+    badge: "Commercial",
+    features: [
+      "Up to 5 workspaces",
+      "Up to 500 corridor runs/month",
+      "Priority support + onboarding office hours",
+      "Advanced reporting workflow and KPI review",
+      "Early access to new data connectors",
+    ],
+    cta: "Start Professional Pilot",
+  },
+];
+
+export default function PricingPage() {
+  return (
+    <section className="space-y-8">
+      <header className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pricing</p>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">OpenPlan Pricing for Pilot Agencies</h1>
+        <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+          Transparent pilot pricing for corridor analysis workflows. AI accelerates drafting, but final planning
+          recommendations must be reviewed and approved by a qualified human professional.
+        </p>
+      </header>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {plans.map((plan) => (
+          <article key={plan.name} className="rounded-2xl border border-border/80 bg-card p-6 shadow-[0_10px_24px_rgba(20,33,43,0.06)]">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-semibold tracking-tight">{plan.name}</h2>
+              <StatusBadge tone="info">{plan.badge}</StatusBadge>
+            </div>
+            <p className="mt-2 text-3xl font-semibold tracking-tight">{plan.price}</p>
+            <ul className="mt-4 list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+              {plan.features.map((feature) => (
+                <li key={feature}>{feature}</li>
+              ))}
+            </ul>
+            <Link
+              href="/sign-up"
+              className="mt-5 inline-flex rounded-full border border-border px-4 py-2 text-sm font-semibold transition hover:border-primary hover:text-primary"
+            >
+              {plan.cta}
+            </Link>
+          </article>
+        ))}
+      </div>
+
+      <article className="rounded-2xl border border-border/80 bg-card p-5 text-sm text-muted-foreground shadow-[0_10px_24px_rgba(20,33,43,0.06)]">
+        <p className="font-medium text-foreground">Implementation notes</p>
+        <ul className="mt-2 list-disc space-y-1.5 pl-5">
+          <li>Pricing shown is baseline pilot pricing and may vary by agency complexity and data requirements.</li>
+          <li>Stripe checkout wiring is in progress; sign-up currently routes through pilot onboarding flow.</li>
+          <li>No hidden fees, punitive change orders, or black-box scoring claims.</li>
+        </ul>
+      </article>
+    </section>
+  );
+}

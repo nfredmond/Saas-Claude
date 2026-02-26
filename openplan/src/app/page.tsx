@@ -16,6 +16,13 @@ const quickLinks = [
     eyebrow: "Workspace",
   },
   {
+    href: "/pricing",
+    title: "View Pilot Pricing",
+    description:
+      "Review Starter and Professional plans with transparent pilot packaging and implementation notes.",
+    eyebrow: "Commercial",
+  },
+  {
     href: "/sign-up",
     title: "Start a Pilot Workspace",
     description:
@@ -79,7 +86,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {quickLinks.map((link) => (
           <Link
             key={link.href}
