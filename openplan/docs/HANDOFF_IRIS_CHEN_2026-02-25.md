@@ -78,6 +78,9 @@ Production URL alias:
 - `OPENPLAN_BILLING_WEBHOOK_SECRET`
 - `OPENPLAN_STRIPE_WEBHOOK_SECRET`
 - `OPENPLAN_STRIPE_SECRET_KEY`
+- `OPENPLAN_STRIPE_ALLOW_GUARDED_FALLBACK` (default false; only true for controlled migration windows)
+- `OPENPLAN_STRIPE_WEBHOOK_SECRET`
+- `OPENPLAN_STRIPE_SECRET_KEY`
 
 ## 6) Notes / cautions
 - Repo has some in-progress non-billing files outside these commits; avoid broad staging.

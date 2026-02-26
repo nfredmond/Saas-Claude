@@ -21,6 +21,17 @@ type WebhookEnvelope = {
   fallbackReason?: "missing_webhook_secret" | "missing_sdk";
 };
 
+function isGuardedStripeFallbackAllowed(): boolean {
+  const explicitAllow =
+    process.env.OPENPLAN_STRIPE_ALLOW_GUARDED_FALLBACK?.trim().toLowerCase() === "true";
+
+  if (explicitAllow) {
+    return true;
+  }
+
+  return process.env.NODE_ENV !== "production";
+}
+
 function isLegacyAuthorized(request: NextRequest): boolean {
   const expectedSecret = process.env.OPENPLAN_BILLING_WEBHOOK_SECRET?.trim();
   if (!expectedSecret) {
@@ -153,7 +164,9 @@ export async function POST(request: NextRequest) {
         stripeVerification.reason === "missing_webhook_secret" || stripeVerification.reason === "missing_sdk"
           ? stripeVerification.reason
           : undefined;
-      const fallbackAllowed = Boolean(fallbackReason && legacyAuthorized);
+      const fallbackAllowed = Boolean(
+        fallbackReason && legacyAuthorized && isGuardedStripeFallbackAllowed()
+      );
 
       if (fallbackAllowed) {
         const parsedLegacy = parseLegacyWebhookPayload(parsedBody);
@@ -183,6 +196,7 @@ export async function POST(request: NextRequest) {
           reason: stripeVerification.reason,
           message: stripeVerification.message ?? null,
           hasLegacyAuth: legacyAuthorized,
+          guardedFallbackAllowed: isGuardedStripeFallbackAllowed(),
           durationMs: Date.now() - startedAt,
         });
 
@@ -191,6 +205,7 @@ export async function POST(request: NextRequest) {
             error: "Stripe webhook verification failed",
             reason: stripeVerification.reason,
             message: stripeVerification.message,
+            fallbackAllowed: isGuardedStripeFallbackAllowed(),
           },
           { status: getStripeVerificationStatus(stripeVerification.reason) }
         );

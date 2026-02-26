@@ -95,7 +95,12 @@ OPENPLAN_STRIPE_SECRET_KEY=
      ```
    - Confirm webhook route returns `200` and billing events include `verificationMode: "stripe_signature"`.
 
+## Production strict-mode update (2026-02-25)
+- Stripe SDK is now installed as a first-class dependency (`stripe`).
+- Guarded fallback behavior is now **disabled by default in production**.
+- Guarded fallback can be enabled explicitly (for temporary migration windows) with:
+  - `OPENPLAN_STRIPE_ALLOW_GUARDED_FALLBACK=true`
+
 ## TODO markers / known constraints
-- Stripe SDK is currently optional and not yet a hard dependency.
-- Native verification scaffold uses dynamic module loading and a guarded fallback path for environments not yet migrated to Stripe SDK.
 - Plan mapping from Stripe price metadata should be finalized when Stripe Checkout Session creation lands.
+- Final tightening step: remove guarded fallback path entirely once all upstream webhook senders are Stripe-native.
