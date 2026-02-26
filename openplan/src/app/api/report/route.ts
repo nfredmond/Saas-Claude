@@ -7,6 +7,7 @@ import { createApiAuditLogger } from "@/lib/observability/audit";
 const reportRequestSchema = z.object({
   runId: z.string().uuid(),
   format: z.enum(["html", "pdf"]).default("html"),
+  template: z.enum(["atp", "ss4a"]).default("atp"),
 });
 
 function esc(value: string): string {
@@ -106,10 +107,27 @@ function pdfEscape(text: string): string {
     .replaceAll(")", "\\)");
 }
 
+function getTemplateMeta(template: "atp" | "ss4a") {
+  if (template === "ss4a") {
+    return {
+      label: "SS4A",
+      subtitle: "Safe Streets and Roads for All framing",
+      emphasis: "Crash reduction, safe system countermeasures, and equitable safety outcomes.",
+    };
+  }
+
+  return {
+    label: "ATP",
+    subtitle: "Active Transportation Program framing",
+    emphasis: "Mode shift, active access, and disadvantaged community benefit alignment.",
+  };
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildPdf(run: any): Uint8Array {
+function buildPdf(run: any, template: "atp" | "ss4a"): Uint8Array {
   const encoder = new TextEncoder();
   const metrics = (run.metrics ?? {}) as Record<string, unknown>;
+  const templateMeta = getTemplateMeta(template);
   const createdAt = run.created_at ? new Date(run.created_at).toISOString() : "Unknown";
   const title = sanitizeText((run.title as string) ?? "Corridor Analysis Report");
   const queryText = sanitizeText(run.query_text);
@@ -132,6 +150,8 @@ function buildPdf(run: any): Uint8Array {
 
   const lines: string[] = [
     "OpenPlan Report",
+    `Template: ${templateMeta.label} (${templateMeta.subtitle})`,
+    `Focus: ${templateMeta.emphasis}`,
     `Title: ${title}`,
     `Run ID: ${sanitizeText(run.id)}`,
     `Created At: ${createdAt}`,
@@ -201,8 +221,9 @@ function buildPdf(run: any): Uint8Array {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildHtml(run: any): string {
+function buildHtml(run: any, template: "atp" | "ss4a"): string {
   const m = (run.metrics ?? {}) as Record<string, unknown>;
+  const templateMeta = getTemplateMeta(template);
   const timestamp = run.created_at ? new Date(run.created_at).toLocaleString() : "Unknown";
   const generatedAt = new Date().toLocaleString();
   const title = (run.title as string) ?? "Corridor Analysis Report";
@@ -260,7 +281,7 @@ function buildHtml(run: any): string {
   <div class="logo">OpenPlan</div>
   <h1>${esc(title)}</h1>
   <div class="subtitle">
-    Generated: ${esc(generatedAt)} · Analysis run: ${esc(timestamp)} · Confidence: ${esc(confidence)} · Narrative mode: ${esc(aiNarrativeStatus)}
+    Generated: ${esc(generatedAt)} · Analysis run: ${esc(timestamp)} · Program lens: ${esc(templateMeta.label)} · Confidence: ${esc(confidence)} · Narrative mode: ${esc(aiNarrativeStatus)}
   </div>
 </div>
 
@@ -288,12 +309,19 @@ function buildHtml(run: any): string {
 </div>
 ${scoreBar(Number(m.overallScore) || 0, "Overall Composite Score")}
 
+<h2>Funding Program Lens</h2>
+<div class="summary-box">
+  <strong>${esc(templateMeta.label)} framing:</strong> ${esc(templateMeta.subtitle)}
+  <br/><br/>
+  ${esc(templateMeta.emphasis)}
+</div>
+
 <!-- ANALYSIS SUMMARY -->
 <h2>Analysis Summary</h2>
 <div class="summary-box">${esc(run.summary_text ?? "No summary available.")}</div>
 
 <!-- AI INTERPRETATION -->
-<h2>AI Interpretation (Grant Narrative)</h2>
+<h2>AI Interpretation (${esc(templateMeta.label)} Narrative)</h2>
 <div class="summary-box">${esc(aiInterpretation ?? run.summary_text ?? "No interpretation available.")}</div>
 
 <!-- DEMOGRAPHICS -->
@@ -416,6 +444,7 @@ export async function POST(request: NextRequest) {
   const startedAt = Date.now();
   let runId: string | undefined;
   let format: "html" | "pdf" = "html";
+  let template: "atp" | "ss4a" = "atp";
 
   try {
     const body = await request.json().catch(() => null);
@@ -436,6 +465,7 @@ export async function POST(request: NextRequest) {
 
     runId = parsed.data.runId;
     format = parsed.data.format;
+    template = parsed.data.template;
 
     const supabase = await createClient();
     const { data: run, error } = await supabase
@@ -482,12 +512,13 @@ export async function POST(request: NextRequest) {
     audit.info("report_generated", {
       runId,
       format,
+      template,
       durationMs,
       reportGeneratedCount: currentReportCount + 1,
     });
 
     if (format === "pdf") {
-      const pdfBytes = buildPdf(run);
+      const pdfBytes = buildPdf(run, template);
       const pdfBuffer = pdfBytes.buffer.slice(
         pdfBytes.byteOffset,
         pdfBytes.byteOffset + pdfBytes.byteLength
@@ -502,7 +533,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return new NextResponse(buildHtml(run), {
+    return new NextResponse(buildHtml(run, template), {
       status: 200,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
@@ -510,6 +541,7 @@ export async function POST(request: NextRequest) {
     audit.error("report_unhandled_error", {
       runId,
       format,
+      template,
       durationMs: Date.now() - startedAt,
       error,
     });

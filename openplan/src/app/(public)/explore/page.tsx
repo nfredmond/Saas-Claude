@@ -72,6 +72,7 @@ type WorkspaceBootstrapResponse = {
 };
 
 type WorkspaceLoadState = "loading" | "loaded" | "signedOut" | "noMembership" | "error";
+type ReportTemplate = "atp" | "ss4a";
 
 function collectPositions(geometry: CorridorGeometry): Position[] {
   if (geometry.type === "Polygon") {
@@ -123,6 +124,7 @@ export default function ExplorePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [reportTemplate, setReportTemplate] = useState<ReportTemplate>("atp");
   const [error, setError] = useState("");
   const [workspaceLoadState, setWorkspaceLoadState] = useState<WorkspaceLoadState>("loading");
   const [workspaceName, setWorkspaceName] = useState<string | null>(null);
@@ -397,7 +399,7 @@ export default function ExplorePage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ runId: analysisResult.runId }),
+        body: JSON.stringify({ runId: analysisResult.runId, template: reportTemplate }),
       });
 
       if (!response.ok) {
@@ -436,7 +438,7 @@ export default function ExplorePage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ runId: analysisResult.runId, format: "pdf" }),
+        body: JSON.stringify({ runId: analysisResult.runId, format: "pdf", template: reportTemplate }),
       });
 
       if (!response.ok) {
@@ -646,6 +648,29 @@ export default function ExplorePage() {
               placeholder="Example: Evaluate transit accessibility, safety risk, and equity implications for this corridor."
               rows={4}
             />
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Report template</p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={reportTemplate === "atp" ? "secondary" : "outline"}
+                  onClick={() => setReportTemplate("atp")}
+                >
+                  ATP
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={reportTemplate === "ss4a" ? "secondary" : "outline"}
+                  onClick={() => setReportTemplate("ss4a")}
+                >
+                  SS4A
+                </Button>
+                <StatusBadge tone="info">Current: {reportTemplate.toUpperCase()}</StatusBadge>
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={() => void runAnalysis()} disabled={!canSubmit || isSubmitting}>
                 {isSubmitting ? "Running analysis..." : "Run Corridor Analysis"}
@@ -656,7 +681,7 @@ export default function ExplorePage() {
                 onClick={() => void generateReport()}
                 disabled={!analysisResult?.runId || isGeneratingReport}
               >
-                {isGeneratingReport ? "Generating report..." : "Open HTML Report"}
+                {isGeneratingReport ? "Generating report..." : `Open ${reportTemplate.toUpperCase()} HTML Report`}
               </Button>
               <Button
                 type="button"
@@ -664,7 +689,7 @@ export default function ExplorePage() {
                 onClick={() => void downloadPdfReport()}
                 disabled={!analysisResult?.runId || isDownloadingPdf}
               >
-                {isDownloadingPdf ? "Preparing PDF..." : "Download PDF Report"}
+                {isDownloadingPdf ? "Preparing PDF..." : `Download ${reportTemplate.toUpperCase()} PDF`}
               </Button>
             </div>
             {error ? <ErrorState compact title="Please review" description={error} /> : null}
