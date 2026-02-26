@@ -29,6 +29,9 @@ Convert current technical MVP into a pilot-ready commercial product with repeata
    - Acceptance:
      - New pilot agency can be provisioned with workspace + default settings in <10 minutes.
      - Onboarding checklist documented and repeatable.
+   - Status (2026-02-26):
+     - ✅ Added `POST /api/workspaces/bootstrap` for authenticated workspace + owner-member provisioning with slug conflict retry.
+     - ✅ Added onboarding runbook: `docs/PILOT_ONBOARDING_RUNBOOK.md` with 10-minute checklist and exact API call example.
 
 4. **Data quality + source transparency panel in UI**
    - Owner: Sofia
