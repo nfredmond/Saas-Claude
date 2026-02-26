@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { logBillingEvent } from "@/lib/billing/events";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { createApiAuditLogger } from "@/lib/observability/audit";
 
@@ -81,6 +82,26 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ error: "Failed to apply billing update" }, { status: 500 });
+  }
+
+  try {
+    await logBillingEvent({
+      workspaceId: payload.workspaceId,
+      eventType: "webhook_billing_updated",
+      source: payload.source ?? "webhook",
+      payload: {
+        subscriptionStatus: payload.subscriptionStatus,
+        subscriptionPlan: payload.subscriptionPlan ?? null,
+        stripeCustomerId: payload.stripeCustomerId ?? null,
+        stripeSubscriptionId: payload.stripeSubscriptionId ?? null,
+        currentPeriodEnd: payload.currentPeriodEnd ?? null,
+      },
+    });
+  } catch (eventError) {
+    audit.warn("billing_event_log_failed", {
+      workspaceId: payload.workspaceId,
+      message: eventError instanceof Error ? eventError.message : "unknown",
+    });
   }
 
   audit.info("workspace_billing_updated", {

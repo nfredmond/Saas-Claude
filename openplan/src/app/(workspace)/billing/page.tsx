@@ -92,6 +92,13 @@ export default async function BillingPage({
   const status = normalizeSubscriptionStatus(workspace.subscription_status ?? null);
   const plan = workspace.subscription_plan ?? workspace.plan ?? "starter";
 
+  const { data: billingEvents } = await supabase
+    .from("billing_events")
+    .select("id, event_type, source, created_at, payload")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
   return (
     <section className="space-y-6">
       <header className="space-y-2">
@@ -137,6 +144,31 @@ export default async function BillingPage({
             Start Professional Checkout
           </Link>
         </div>
+      </article>
+
+      <article className="rounded-2xl border border-border/80 bg-card p-5 shadow-[0_10px_24px_rgba(20,33,43,0.06)] space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">Recent Billing Events</h2>
+
+        {!billingEvents || billingEvents.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No billing events recorded yet for this workspace.</p>
+        ) : (
+          <ul className="space-y-2.5">
+            {billingEvents.map((event) => (
+              <li key={event.id} className="rounded-xl border border-border/70 bg-background p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone="neutral">{titleCase(event.event_type)}</StatusBadge>
+                  <StatusBadge tone="info">{titleCase(event.source)}</StatusBadge>
+                  <p className="text-[0.72rem] uppercase tracking-[0.08em] text-muted-foreground">
+                    {event.created_at ? new Date(event.created_at).toLocaleString() : "N/A"}
+                  </p>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground break-all">
+                  {event.payload ? JSON.stringify(event.payload) : "{}"}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
       </article>
     </section>
   );

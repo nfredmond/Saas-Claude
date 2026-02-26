@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { logBillingEvent } from "@/lib/billing/events";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { createApiAuditLogger } from "@/lib/observability/audit";
 
@@ -107,6 +108,26 @@ async function handleCheckout(workspaceId: string, plan: Plan, request: NextRequ
     });
 
     return NextResponse.json({ error: "Failed to initialize checkout" }, { status: 500 });
+  }
+
+  try {
+    await logBillingEvent({
+      workspaceId,
+      eventType: "checkout_initialized",
+      source: checkout.mode === "payment_link" ? "stripe_payment_link" : "mock_checkout",
+      payload: {
+        plan,
+        mode: checkout.mode,
+        userId: user.id,
+      },
+    });
+  } catch (eventError) {
+    audit.warn("billing_event_log_failed", {
+      workspaceId,
+      plan,
+      mode: checkout.mode,
+      message: eventError instanceof Error ? eventError.message : "unknown",
+    });
   }
 
   audit.info("checkout_initialized", {
