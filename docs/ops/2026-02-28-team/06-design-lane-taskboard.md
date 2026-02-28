@@ -14,6 +14,7 @@
 
 ## Principal Support to Camila
 - DONE — Must-fix patch text package prepared (`14-camila-v1_1-must-fix-patchtext.md`)
+- DONE — Rubric-based Tier 1 sign-off review published (`15-camila-tier1-signoff-rubric-review-v1.md`)
 - IN_PROGRESS — Awaiting v1.1 resubmission for final release sign-off
 
 ## Mateo (Assistant Planner)
