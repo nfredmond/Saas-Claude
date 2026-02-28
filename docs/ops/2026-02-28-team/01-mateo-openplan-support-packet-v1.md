@@ -23,6 +23,10 @@ Support Camila’s design sprint by preparing implementation-ready planning stru
    - Draft structured review prompts for Camila’s +24h checkpoint.
    - Separate: clarifications, scope risks, and “ready now” items.
 
+## Starter Artifacts (use/adapt)
+- `openplan/docs/ops/2026-02-28-team/05-design-to-implementation-intake-sheet-template.md`
+- `openplan/docs/ops/2026-02-28-team/03-camila-24h-checkpoint-review-template.md`
+
 ## Acceptance Criteria
 - Complete inventory for all 5 priority screens.
 - Intake sheet is implementation-usable (no ambiguous fields).

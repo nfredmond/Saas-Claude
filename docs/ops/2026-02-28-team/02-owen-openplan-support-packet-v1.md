@@ -23,6 +23,10 @@ Translate Camila’s design sprint outputs into a rigorous acceptance/QA frame t
    - Identify top 5 failure modes that could delay implementation after Camila handoff.
    - For each: mitigation action and owner.
 
+## Starter Artifacts (use/adapt)
+- `openplan/docs/ops/2026-02-28-team/04-camila-checkpoint-scoring-rubric-v1.md`
+- `openplan/docs/ops/2026-02-28-team/03-camila-24h-checkpoint-review-template.md`
+
 ## Acceptance Criteria
 - Rubric can be used in <10 minutes per checkpoint.
 - Review template is concise and repeatable.
