@@ -9,6 +9,8 @@ Use: fast finalization immediately after principal PASS decision.
 
 The Tier 1 package has completed required readability and decision-clarity revisions and is prepared for final principal confirmation.
 
+Positioning line for outward release contexts: **Based in Northern California, serving agencies across the United States.**
+
 ### Included files
 1. `OLD_MILL_CLIENT_BRIEF_v2_*.pdf`
 2. `OLD_MILL_COUNCIL_COVER_v2_*.pdf`
