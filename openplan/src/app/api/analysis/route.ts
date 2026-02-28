@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { monthlyRunLimitForPlan, normalizeWorkspacePlan, runLimitMessage } from "@/lib/billing/limits";
-import { isWorkspaceSubscriptionActive, subscriptionGateMessage } from "@/lib/billing/subscription";
+import { runLimitMessage } from "@/lib/billing/limits";
+import {
+  isWorkspaceSubscriptionActive,
+  resolveWorkspaceEntitlements,
+  subscriptionGateMessage,
+} from "@/lib/billing/subscription";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { fetchCensusForCorridor, bboxFromGeojson } from "@/lib/data-sources/census";
 import { fetchLODESForCorridor } from "@/lib/data-sources/lodes";
@@ -12,6 +16,7 @@ import { computeCorridorScores } from "@/lib/data-sources/scoring";
 import { classifyWalkBikeAccess } from "@/lib/accessibility/isochrone";
 import { generateGrantInterpretation } from "@/lib/ai/interpret";
 import { createApiAuditLogger } from "@/lib/observability/audit";
+import { validateCorridorGeometry } from "@/lib/geo/corridor-geometry";
 
 type Position = [number, number] | [number, number, number];
 
@@ -161,6 +166,19 @@ export async function POST(request: NextRequest) {
     const { corridorGeojson, queryText, workspaceId: parsedWorkspaceId } = parsed.data;
     workspaceId = parsedWorkspaceId;
 
+    const geometryValidation = validateCorridorGeometry(corridorGeojson);
+    if (!geometryValidation.ok) {
+      audit.warn("geometry_validation_failed", {
+        issues: geometryValidation.issues.length,
+        sample: geometryValidation.issues.slice(0, 3),
+      });
+
+      return NextResponse.json(
+        { error: "Invalid corridor geometry", details: geometryValidation.issues },
+        { status: 400 }
+      );
+    }
+
     const userSupabase = await createClient();
     const {
       data: { user },
@@ -213,13 +231,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: gateMessage }, { status: 402 });
     }
 
-    const normalizedPlan = normalizeWorkspacePlan(
-      (workspaceBilling?.subscription_plan as string | undefined) ??
-        (workspaceBilling?.plan as string | undefined) ??
-        null
-    );
-
-    const monthlyLimit = monthlyRunLimitForPlan(normalizedPlan);
+    const { plan, entitlements } = resolveWorkspaceEntitlements(workspaceBilling ?? {});
+    const monthlyLimit = entitlements.monthlyRunLimit;
     if (monthlyLimit !== null) {
       const currentMonthStart = new Date();
       currentMonthStart.setUTCDate(1);
@@ -244,11 +257,11 @@ export async function POST(request: NextRequest) {
 
       const usedRuns = monthlyRuns ?? 0;
       if (usedRuns >= monthlyLimit) {
-        const limitMessage = runLimitMessage(normalizedPlan, usedRuns, monthlyLimit);
+        const limitMessage = runLimitMessage(plan, usedRuns, monthlyLimit);
         audit.warn("run_limit_reached", {
           workspaceId,
           userId: user.id,
-          plan: normalizedPlan,
+          plan,
           usedRuns,
           monthlyLimit,
         });

@@ -6,20 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ErrorState } from "@/components/ui/state-block";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
-
-type Position = [number, number] | [number, number, number];
-
-type Polygon = {
-  type: "Polygon";
-  coordinates: Position[][];
-};
-
-type MultiPolygon = {
-  type: "MultiPolygon";
-  coordinates: Position[][][];
-};
-
-type CorridorGeometry = Polygon | MultiPolygon;
+import {
+  type CorridorGeometry,
+  validateCorridorGeometry,
+} from "@/lib/geo/corridor-geometry";
 
 type Feature = {
   type: "Feature";
@@ -98,6 +88,12 @@ export function CorridorUpload({ onUpload }: CorridorUploadProps) {
 
       if (!geometry) {
         setError("GeoJSON must contain a Polygon or MultiPolygon geometry.");
+        return;
+      }
+
+      const validation = validateCorridorGeometry(geometry);
+      if (!validation.ok) {
+        setError(validation.issues[0] ?? "GeoJSON geometry failed validation.");
         return;
       }
 

@@ -23,7 +23,7 @@ Catch geospatial failures before demos, council packets, or pilot operations.
 
 ## Current v1 implementation mapping
 - **Layer availability:** partial (runtime source modules available; canonical GIS layer tables not complete).
-- **CRS + geometry sanity:** partial (shape-type validation exists; CRS hard gate missing).
+- **CRS + geometry sanity:** improved (WGS84 bounds + ring-closure checks now enforced for uploaded corridor geometry; full canonical-layer topology gates still pending).
 - **Core analytics query:** available via `/api/analysis` + test suite coverage.
 - **Map render:** covered by production build pass (Next.js map stack compile).
 - **Export:** covered by `export-download` tests; council pack export workflow still partial.
@@ -55,7 +55,7 @@ Catch geospatial failures before demos, council packets, or pilot operations.
 | Step | Result | Notes |
 |---|---|---|
 | Layer availability | ⚠️ Partial | Runtime source modules present; canonical pilot layers incomplete |
-| CRS + geometry sanity | ⚠️ Partial | Polygon/MultiPolygon gate exists; explicit CRS harmonization missing |
+| CRS + geometry sanity | 🟡 Improved | Polygon/MultiPolygon + WGS84 bounds + ring-closure gate now active for corridor ingest; broader layer harmonization remains pending |
 | Core analytics query check | ✅ Pass | API test suite and analysis route validation coverage present |
 | Map render check | ✅ Pass | `npm run build` successful |
 | Export check | ✅ Pass | export route tests pass |
@@ -64,8 +64,8 @@ Catch geospatial failures before demos, council packets, or pilot operations.
 ## Top infra risks + immediate mitigations
 1. **Risk:** Missing canonical pilot GIS layers (P0 for council-grade output).
    - **Mitigation:** Define/persist canonical layer registry and quality flags before council analytics release.
-2. **Risk:** CRS ambiguity in uploaded geometries.
-   - **Mitigation:** Add explicit WGS84 assertion + coordinate range check at ingest.
+2. **Risk:** CRS/topology drift in future canonical layers beyond corridor ingest.
+   - **Mitigation:** Extend current WGS84 ingest gate to canonical layer ETL/topology checks and enforce pre-release QA.
 3. **Risk:** Mixed source fallback behavior can reduce confidence without explicit caveats.
    - **Mitigation:** Require source/confidence metadata in every metric export and map footer.
 

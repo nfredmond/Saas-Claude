@@ -50,7 +50,7 @@ Shift GIS capacity to OpenPlan pilot-readiness by locking geospatial reliability
   - `npm run test` ✅ (12 files / 40 tests passed)
   - `npm run build` ✅
   - `npm run lint` ⚠️ (1 non-blocking warning in `src/lib/export/download.ts`)
-- Confirmed corridor upload currently validates only `Polygon` / `MultiPolygon` shapes and file extension; CRS enforcement is not explicit.
+- Implemented corridor geometry hard gate for WGS84 bounds + closed-ring validation (client upload + `/api/analysis` server guard).
 - Confirmed existing analytics are currently source-mixed (Census/OSM/FARS or SWITRS fallback + estimates), requiring council-facing caveat discipline.
 
 ## Required status format
