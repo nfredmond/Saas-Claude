@@ -33,9 +33,9 @@
 
 ## Active Cross-Lane Blockers (as of now)
 1. P0 deterministic workspace-bound provisioning path still open (canonical lock).
-2. No QGIS MCP configured in active stack.
-3. CARTO CLI install/auth not yet completed.
-4. No unified one-command `story-pack` pipeline + QA gate yet.
+2. QGIS toolchain not installed yet (`qgis_process` absent); MCP intentionally deferred to phase 2 after CLI baseline.
+3. CARTO CLI install path completed (v0.1.2); org auth (`carto auth login`) still pending.
+4. `make story-pack` skeleton now added; QA gate automation still pending.
 
 ## Immediate Next Actions
 1. Collect 8:30 PM evidence-based updates from all owners.

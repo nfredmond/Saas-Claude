@@ -149,5 +149,8 @@ This is the missing bridge between analysis and persuasion—and hard to replica
 - `23-1-qgis-census-workflow-spec.md`
 - `23-2-cartographic-qa-rubric.md`
 - `23-3-sample-map-output-checklist.md`
+- `23-4-geospatial-toolchain-implementation-notes.md`
 
-Status: Draft v1 complete for GIS method framing + QA + multi-channel export checklist.
+Status:
+- GIS method framing + QA + multi-channel export checklist: Draft v1 complete.
+- Engineering scaffolding: CARTO CLI controlled install path + QGIS path decision + `make story-pack` skeleton drafted.
