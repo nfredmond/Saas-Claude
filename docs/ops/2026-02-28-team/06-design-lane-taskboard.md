@@ -49,3 +49,16 @@
 - DONE — Production `STRIPE_LINK_*` completeness confirmed (12/12)
 - DONE — Readiness + smoke checks passed (configured=12, smoke PASS=12/12)
 - DONE — Monetization checkpoint closed as READY
+
+
+## Lane 23 — Geospatial Story Fabric (P2)
+- IN_PROGRESS — Governance + checkpoint cadence active (`24-geospatial-story-fabric-governance-board.md`)
+- TODO — QGIS automation baseline decision (CLI vs MCP)
+- TODO — CARTO CLI install/auth path and command log
+- TODO — story-pack one-command contract (`report/web/motion/manifest`)
+- TODO — Cross-discipline QA gate (CRS/readability/contrast/metadata)
+
+## OpenPlan Paid-Access Reliability (P0)
+- IN_PROGRESS — deterministic workspace-bound purchase + billing mutation hardening
+- TODO — mismatch + idempotency hardening verification
+- TODO — final READY/HOLD decision memo at 9:30 PM (`22-paid-access-go-no-go-decision-memo-template.md`)
