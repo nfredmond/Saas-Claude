@@ -150,7 +150,11 @@ This is the missing bridge between analysis and persuasion—and hard to replica
 - `23-2-cartographic-qa-rubric.md`
 - `23-3-sample-map-output-checklist.md`
 - `23-4-geospatial-toolchain-implementation-notes.md`
+- `23-5-story-pack-e2e-test-matrix.md`
+- `23-6-story-pack-packaging-checklist.md`
+- `23-7-story-pack-reproducibility-checklist.md`
 
 Status:
 - GIS method framing + QA + multi-channel export checklist: Draft v1 complete.
 - Engineering scaffolding: CARTO CLI controlled install path + QGIS path decision + `make story-pack` skeleton drafted.
+- QA/test-packaging/repro lane (Mateo): Draft v1 complete for end-to-end matrix + packaging + reproducibility controls.
